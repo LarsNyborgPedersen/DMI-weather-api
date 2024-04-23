@@ -6,7 +6,6 @@ import os
 load_dotenv('api_key.env')  # Load environment variables from .env file
 
 # Replace `<api-key>` with your actual API key
-#api_key = "3a38d6e6-2dfa-4e77-b261-6ba0d61974e5"
 api_key = os.getenv('API_KEY')
 base_url = "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items"
 
@@ -41,17 +40,26 @@ for start_date, end_date in dates:
 # Create a DataFrame
 df = pd.DataFrame(observations)
 
-# Convert the 'observed' column to datetime format
+# Convert the 'observed' and 'created' columns to datetime format
 df['observed'] = pd.to_datetime(df['observed'])
+df['created'] = pd.to_datetime(df['created'])
 
-# Display the DataFrame
-print(df)
+# Remove timezone information for simplicity
+df['observed'] = df['observed'].dt.tz_localize(None)
+df['created'] = df['created'].dt.tz_localize(None)
 
-# Convert the 'observed' column to datetime format and remove timezone information
-df['observed'] = pd.to_datetime(df['observed']).dt.tz_localize(None)
+# Pivot the table to make each parameter a separate column
+df_pivot = df.pivot_table(index=['observed', 'stationId', 'latitude', 'longitude', 'created'],
+                          columns='parameterId',
+                          values='value',
+                          aggfunc='first').reset_index()
+
+# Sort the DataFrame by 'parameterId', 'stationId', then 'created'
+df_sorted = df_pivot.sort_values(by=['stationId', 'created'])
 
 # Save the DataFrame to an Excel file, overriding any existing file
 excel_file_path = 'weather_data.xlsx'
-df.to_excel(excel_file_path, index=False, engine='openpyxl')
+df_sorted.to_excel(excel_file_path, index=False, engine='openpyxl')
 
 print(f"Data saved to {excel_file_path}")
+print(df_sorted)
