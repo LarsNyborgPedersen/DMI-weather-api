@@ -3,63 +3,76 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
-load_dotenv('api_key.env')  # Load environment variables from .env file
+# Load API Key
+load_dotenv('api_key.env')
 
 # Replace `<api-key>` with your actual API key
-api_key = os.getenv('API_KEY')
-base_url = "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items"
+api_key_historical = os.getenv('API_KEY_HISTORICAL')
+api_key_forecast = os.getenv('API_KEY_FORECAST')
 
-# Define the dates for which you want to fetch weather data
-dates = [
+# Base URLs for historical and forecast data
+base_url_hist = "https://dmigw.govcloud.dk/v2/metObs/collections/observation/items"
+base_url_forecast = "https://dmigw.govcloud.dk/v1/forecastedr/collections/harmonie_dini_sf/position"
+
+# Date ranges for historical and forecast data
+dates_hist = [
     ("2019-08-01T00:00:00+02:00", "2019-08-09T00:00:00+02:00"),
     ("2020-08-01T00:00:00+02:00", "2020-08-09T00:00:00+02:00"),
     ("2021-08-01T00:00:00+02:00", "2021-08-09T00:00:00+02:00")
 ]
+date_forecast = "2024-04-26T00:00:00+02:00/2024-04-28T00:00:00+02:00"
 
-# Prepare a list to hold all observations
-observations = []
-
-# Loop through each date range
-for start_date, end_date in dates:
-    params = {
-        'api-key': api_key,
-        'datetime': f"{start_date}/{end_date}",
-        'limit': 1000  # Adjust limit as needed, considering the API's max limit
-    }
-    response = requests.get(base_url, params=params)
+# Function to fetch and process data
+def fetch_data(url, params):
+    response = requests.get(url, params=params)
     if response.status_code == 200:
-        data = response.json()
-        for feature in data.get('features', []):
-            obs = feature['properties']
-            obs['latitude'] = feature['geometry']['coordinates'][1]
-            obs['longitude'] = feature['geometry']['coordinates'][0]
-            observations.append(obs)
+        return response.json()['features']
     else:
-        print(f"Failed to fetch data for {start_date} to {end_date}")
+        print(f"Failed to fetch data with params: {params}")
+        return []
 
-# Create a DataFrame
-df = pd.DataFrame(observations)
+# Fetch historical data
+observations = []
+for start_date, end_date in dates_hist:
+    params = {'api-key': api_key_historical, 'datetime': f"{start_date}/{end_date}", 'limit': 1000}
+    features = fetch_data(base_url_hist, params)
+    for feature in features:
+        obs = feature['properties']
+        obs.update({
+            'latitude': feature['geometry']['coordinates'][1],
+            'longitude': feature['geometry']['coordinates'][0]
+        })
+        observations.append(obs)
 
-# Convert the 'observed' and 'created' columns to datetime format
-df['observed'] = pd.to_datetime(df['observed'])
-df['created'] = pd.to_datetime(df['created'])
+# Fetch forecast data
+params_forecast = {
+    'api-key': api_key_forecast,
+    'coords': 'POINT(12.561 55.715)',
+    'crs': 'crs84',
+    'parameter-name': 'temperature-2m,wind-speed-10m',
+    'datetime': date_forecast,
+    'f': 'GeoJSON'
+}
+forecast_data = fetch_data(base_url_forecast, params_forecast)
 
-# Remove timezone information for simplicity
-df['observed'] = df['observed'].dt.tz_localize(None)
-df['created'] = df['created'].dt.tz_localize(None)
+# Process historical data into DataFrame
+df_hist = pd.DataFrame(observations)
+df_hist['observed'] = pd.to_datetime(df_hist['observed']).dt.tz_localize(None)
+df_hist['created'] = pd.to_datetime(df_hist['created']).dt.tz_localize(None)
+df_hist_pivot = df_hist.pivot_table(index=['observed', 'stationId', 'latitude', 'longitude', 'created'],
+                                    columns='parameterId', values='value', aggfunc='first').reset_index()
 
-# Pivot the table to make each parameter a separate column
-df_pivot = df.pivot_table(index=['observed', 'stationId', 'latitude', 'longitude', 'created'],
-                          columns='parameterId',
-                          values='value',
-                          aggfunc='first').reset_index()
+# Process forecast data into DataFrame
+df_forecast = pd.DataFrame([{
+    **feat['properties'],
+    'latitude': feat['geometry']['coordinates'][1],
+    'longitude': feat['geometry']['coordinates'][0],
+    'step': feat['properties'].get('step')
+} for feat in forecast_data])
 
-# Sort the DataFrame by 'parameterId', 'stationId', then 'created'
-df_sorted = df_pivot.sort_values(by=['stationId', 'created'])
+# Save DataFrames to CSV
+df_hist_pivot.to_csv('historical_weather_data.csv', index=False, sep=';')
+df_forecast.to_csv('forecast_weather_data.csv', index=False, sep=";")
 
-# Save the DataFrame to an Excel file, overriding any existing file
-excel_file_path = 'weather_data.xlsx'
-df_sorted.to_excel(excel_file_path, index=False, engine='openpyxl')
-
-print(f"Data saved to {excel_file_path}")
-print(df_sorted)
+print("Historical data saved to 'historical_weather_data.csv'")
+print("Forecast data saved to 'forecast_weather_data.csv'")
