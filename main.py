@@ -72,7 +72,39 @@ df_forecast = pd.DataFrame([{
 
 # Save DataFrames to CSV
 df_hist_pivot.to_csv('historical_weather_data.csv', index=False, sep=';')
-df_forecast.to_csv('forecast_weather_data.csv', index=False, sep=";")
-
 print("Historical data saved to 'historical_weather_data.csv'")
+df_forecast.to_csv('forecast_weather_data.csv', index=False, sep=";")
 print("Forecast data saved to 'forecast_weather_data.csv'")
+
+
+
+
+###########TRYING TO DOWNLOAD DATA BELOW##############################
+###########TRYING TO DOWNLOAD DATA BELOW##############################
+###########TRYING TO DOWNLOAD DATA BELOW##############################
+###########TRYING TO DOWNLOAD DATA BELOW##############################
+###########TRYING TO DOWNLOAD DATA BELOW##############################
+#base_url = 'https://dmigw.govcloud.dk/v1/forecastdata/collections'
+
+# Fetch collections
+#response = requests.get(f"{base_url}?api-key={api_key_forecast}")
+#collections = response.json()
+#print(collections)
+
+
+
+#def display_collections(collections):
+    # Check if collections were fetched successfully
+#    if collections:
+#        print("Available Collections:")
+#        for collection in collections.get('collections', []):  # Adjust based on actual key where collections are listed
+#            print(f"- {collection['id']}")  # Adjust based on actual key for the collection identifier
+#    else:
+#        print("No collections to display.")
+
+# Setup API key and URL
+#api_key = 'your_api_key_here'
+#base_url = 'https://dmigw.govcloud.dk/v1/forecastdata/collections'
+
+# Fetch and display collections
+#display_collections(collections)
